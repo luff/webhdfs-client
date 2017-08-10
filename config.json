@@ -1,0 +1,5 @@
+{
+  "username": "your-hdfs-user",
+  "password": "your-hdfs-user-pw",
+  "rest_api": "http://your-webhdfs-gateway/webhdfs/v1"
+}
