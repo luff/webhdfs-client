@@ -33,16 +33,31 @@ def dfs_home(args, hdfs):
 def dfs_ls(args, hdfs):
   """ list files/dirs status
   """
+  def get_bits(file_type, permission, acl=False):
+    b_t = file_type[0].lower().replace('f', '-')
+    b_p_all = 'rwxrwxrwx'
+    b_p = ''
+    p = int(permission, 8)
+    sticky = (p & 2**9 != 0)
+    for i in range(8, -1, -1):
+      if p & 2**i == 0:
+        b_p += '-'
+      else:
+        b_p += b_p_all[8-i]
+    # sticky bit
+    if (p & 2**9 != 0):
+      b_p = b_p[:-1] + ('t' if b_p[-1] == 'x' else 'T')
+    b_a = '+' if acl else ' '
+    return b_t + b_p + b_a
+
   opts, args = parse_args(args, '')
   if not args:
     args = ['']
-
   for a in args:
-    if len(args) > 1:
-      if a.startswith('/'):
-        print '{}:'.format(a)
-      else:
-        print '~/{}:'.format(a)
+    if a.startswith('/'):
+      print '{}:'.format(a)
+    else:
+      print '~/{}:'.format(a)
     try:
       res = hdfs.list_status(a)
       if not res:
@@ -51,7 +66,7 @@ def dfs_ls(args, hdfs):
         a = a.rstrip('/')
       a = os.path.abspath('/' + a)[1:]
 
-      fmt = '{{}} {{:>4}} {{:{}}} {{:{}}} {{:>{}}} {{}} {{}}'.format(
+      fmt = '{{}} {{:{}}} {{:{}}} {{:>{}}} {{}} {{}}'.format(
         max([len(r['owner']) for r in res]),
         max([len(r['group']) for r in res]),
         max([len(str(r['length'])) for r in res])
@@ -60,13 +75,10 @@ def dfs_ls(args, hdfs):
         r['modificationTime'] = time.strftime(
           '%F %H:%M', time.localtime(r['modificationTime']/1000))
         r['type'] = r['type'][0].lower().replace('f', '-')
-        #r['permission'] = r['permission']
         if a and r['pathSuffix']:
           r['pathSuffix'] = '/' + r['pathSuffix']
-
         print fmt.format(
-          r['type'],
-          r['permission'],
+          get_bits(r['type'], r['permission'], r.get('aclBit', False)),
           r['owner'],
           r['group'],
           r['length'],
@@ -86,6 +98,7 @@ def dfs_cat(args, hdfs):
       print hdfs.open(a)
     except Exception as e:
       print str(e)
+      sys.exit(1)
 
 
 def dfs_mv(args, hdfs):
@@ -93,28 +106,33 @@ def dfs_mv(args, hdfs):
   """
   opts, args = parse_args(args, '')
   if len(args) < 2:
-    print 'help'
+    print 'needs two arguments'
     sys.exit(2)
-  try:
-    print hdfs.rename(args[0], args[1])
-  except Exception as e:
-    print str(e)
+  dst = args[-1]
+  for src in args[:-1]:
+    ddst = '{}/{}'.format(dst.rstrip('/'), os.path.basename(src))
+    if not hdfs.rename(src, ddst) and not hdfs.rename(src, dst):
+      print 'cannot move {} to {}'.format(src, dst)
 
 
 def dfs_put(args, hdfs):
   """ copy from local
   """
   opts, args = parse_args(args, '')
-  try:
-    print hdfs.create(args[0], args[1])
-  except Exception as e:
-    print str(e)
+  #try:
+  #  hdfs.create()
+  #except Exception as e:
+  #  print str(e)
 
 
 def dfs_get(args, hdfs):
   """ copy to local
   """
   opts, args = parse_args(args, '')
+  #try:
+  #  hdfs.open()
+  #except Exception as e:
+  #  print str(e)
 
 
 def dfs_mkdir(args, hdfs):
@@ -126,10 +144,8 @@ def dfs_mkdir(args, hdfs):
     if o == '-p':
       permission = a
   for a in args:
-    try:
-      hdfs.mkdirs(a, permission)
-    except Exception as e:
-      print str(e)
+    if not hdfs.mkdirs(a, permission):
+      print 'cannot make dir {}'.format(a)
 
 
 def dfs_rm(args, hdfs):
@@ -141,10 +157,8 @@ def dfs_rm(args, hdfs):
     if o == '-r':
       recursive = True
   for a in args:
-    try:
-      hdfs.delete(a, recursive)
-    except Exception as e:
-      print str(e)
+    if not hdfs.delete(a, recursive):
+      print 'cannot delete {}'.format(a)
 
 
 def dfs_chown(args, hdfs):
@@ -186,14 +200,16 @@ def dfs_summary(args, hdfs):
   opts, args = parse_args(args, '')
   if not args:
     args = ['']
-  if len(args) > 1:
-    print 'help'
-    sys.exit(2)
-  try:
-    r = hdfs.get_content_summary(args[0])
-    print json.dumps(r, indent=2)
-  except Exception as e:
-    print str(e)
+  for a in args:
+    if a.startswith('/'):
+      print '{}:'.format(a)
+    else:
+      print '~/{}:'.format(a)
+    try:
+      r = hdfs.get_content_summary(args[0])
+      print json.dumps(r, indent=2)
+    except Exception as e:
+      print str(e)
 
 
 

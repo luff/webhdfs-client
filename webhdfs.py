@@ -210,8 +210,6 @@ def main():
   print " > rm -r example"
   print hdfs.delete('example', recursive=True)
 
-  print hdfs.list_status('t.py/')
-
 
 if __name__ == "__main__":
   main()
