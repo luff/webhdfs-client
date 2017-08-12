@@ -151,7 +151,7 @@ def mkdir(dirs, permission):
 
 
 @hdfs_cli.command()
-@click.option('-r', '--recursive', default=False)
+@click.option('-r', '--recursive', is_flag=True)
 @click.argument('path', nargs=-1)
 def rm(path, recursive):
   """ delete files/dirs
