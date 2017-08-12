@@ -1,70 +1,63 @@
 #!/usr/bin/env python
 
-import getopt
+import click
 import json
 import os
 import sys
 import time
-import types
 
 sys.dont_write_bytecode = True
 from webhdfs import WebHDFS
 
 
-def parse_args(args, options, long_options=[]):
-  try:
-    return getopt.getopt(args, options, long_options)
-  except getopt.GetoptError as e:
-    print str(e)
-    sys.exit(2)
+@click.group()
+def hdfs_cli():
+  pass
 
 
-def dfs_home(args, hdfs):
+@hdfs_cli.command()
+def home():
   """ get home dir
   """
-  opts, args = parse_args(args, '')
   try:
-    r = hdfs.get_home_dir()
-    print r
+    click.echo(hdfs.get_home_dir())
   except Exception as e:
-    print str(e)
+    click.echo(str(e))
 
 
-def dfs_ls(args, hdfs):
+@hdfs_cli.command()
+@click.argument('path', nargs=-1)
+def ls(path):
   """ list files/dirs status
   """
   def get_bits(file_type, permission, acl=False):
-    b_t = file_type[0].lower().replace('f', '-')
-    b_p_all = 'rwxrwxrwx'
-    b_p = ''
-    p = int(permission, 8)
-    sticky = (p & 2**9 != 0)
+    bt = file_type[0].lower().replace('f', '-')
+    bp_all = 'rwxrwxrwx'
+    bp = ''
+    # convert oct string
+    pm = int(permission, 8)
     for i in range(8, -1, -1):
-      if p & 2**i == 0:
-        b_p += '-'
-      else:
-        b_p += b_p_all[8-i]
-    # sticky bit
-    if (p & 2**9 != 0):
-      b_p = b_p[:-1] + ('t' if b_p[-1] == 'x' else 'T')
-    b_a = '+' if acl else ' '
-    return b_t + b_p + b_a
+      bp += '-' if (pm & 2**i == 0) else bp_all[8-i]
+    if (pm & 2**9 != 0):
+      # sticky bit
+      bp = bp[:-1] + ('t' if bp[-1] == 'x' else 'T')
+    ba = '+' if acl else ' '
+    return bt + bp + ba
 
-  opts, args = parse_args(args, '')
-  if not args:
-    args = ['']
-  for a in args:
-    if a.startswith('/'):
-      print '{}:'.format(a)
+  if not path:
+    path = ['']
+  for p in path:
+    if p.startswith('/'):
+      click.echo('{}:'.format(p))
     else:
-      print '~/{}:'.format(a)
+      click.echo('~/{}:'.format(p))
     try:
-      res = hdfs.list_status(a)
+      res = hdfs.list_status(p)
       if not res:
         continue
-      if a != '/':
-        a = a.rstrip('/')
-      a = os.path.abspath('/' + a)[1:]
+      if p != '/':
+        p = p.rstrip('/')
+      p = os.path.abspath('/' + p)[1:]
 
       fmt = '{{}} {{:{}}} {{:{}}} {{:>{}}} {{}} {{}}'.format(
         max([len(r['owner']) for r in res]),
@@ -75,175 +68,151 @@ def dfs_ls(args, hdfs):
         r['modificationTime'] = time.strftime(
           '%F %H:%M', time.localtime(r['modificationTime']/1000))
         r['type'] = r['type'][0].lower().replace('f', '-')
-        if a and r['pathSuffix']:
+        if p and r['pathSuffix']:
           r['pathSuffix'] = '/' + r['pathSuffix']
-        print fmt.format(
+        click.echo(fmt.format(
           get_bits(r['type'], r['permission'], r.get('aclBit', False)),
           r['owner'],
           r['group'],
           r['length'],
           r['modificationTime'],
-          a + r['pathSuffix']
-        )
+          p + r['pathSuffix']
+        ))
     except Exception as e:
-      print str(e)
+      click.echo(str(e))
 
 
-def dfs_cat(args, hdfs):
+@hdfs_cli.command()
+@click.argument('files', nargs=-1)
+def cat(files):
   """ output file content
   """
-  opts, args = parse_args(args, '')
-  for a in args:
+  for f in files:
     try:
-      print hdfs.open(a)
+      click.echo(hdfs.open(f))
     except Exception as e:
-      print str(e)
-      sys.exit(1)
+      click.echo(str(e))
 
 
-def dfs_mv(args, hdfs):
+@hdfs_cli.command()
+@click.argument('src', nargs=-1)
+@click.argument('dst', nargs=1)
+def mv(src, dst):
   """ move(rename) files/dirs
   """
-  opts, args = parse_args(args, '')
-  if len(args) < 2:
-    print 'needs two arguments'
-    sys.exit(2)
-  dst = args[-1]
-  for src in args[:-1]:
-    ddst = '{}/{}'.format(dst.rstrip('/'), os.path.basename(src))
-    if not hdfs.rename(src, ddst) and not hdfs.rename(src, dst):
-      print 'cannot move {} to {}'.format(src, dst)
+  for s in src:
+    ddst = '{}/{}'.format(dst.rstrip('/'), os.path.basename(s))
+    if not hdfs.rename(s, ddst) and not hdfs.rename(s, dst):
+      click.echo('cannot move {} to {}'.format(s, dst))
 
 
-def dfs_put(args, hdfs):
+@hdfs_cli.command()
+@click.option('-p', '--permission', default='700')
+@click.option('-f', '--force', is_flag=True)
+@click.argument('src', nargs=1)
+@click.argument('dst', nargs=1)
+def put(src, dst, permission, force):
   """ copy from local
   """
-  opts, args = parse_args(args, '')
-  #try:
-  #  hdfs.create()
-  #except Exception as e:
-  #  print str(e)
+  if not os.path.isfile(src):
+    click.echo('no such file: {}'.format(src))
+  try:
+    with open(src, 'rb') as f:
+      hdfs.create(dst, f.read(), permission, force)
+  except Exception as e:
+    click.echo(str(e))
 
 
-def dfs_get(args, hdfs):
+@hdfs_cli.command()
+@click.option('-f', '--force', is_flag=True)
+@click.argument('src', nargs=1)
+@click.argument('dst', nargs=1)
+def get(src, dst, force):
   """ copy to local
   """
-  opts, args = parse_args(args, '')
-  #try:
-  #  hdfs.open()
-  #except Exception as e:
-  #  print str(e)
+  if os.path.isfile(dst) and not force:
+    click.echo('file already exists: {}'.format(dst))
+  try:
+    with open(dst, 'wb') as f:
+      f.write(hdfs.open(src))
+  except Exception as e:
+    click.echo(str(e))
 
 
-def dfs_mkdir(args, hdfs):
+@hdfs_cli.command()
+@click.option('-p', '--permission', default='700')
+@click.argument('dirs', nargs=-1)
+def mkdir(dirs, permission):
   """ make dirs
   """
-  permission = '700'
-  opts, args = parse_args(args, 'p:')
-  for o, a in opts:
-    if o == '-p':
-      permission = a
-  for a in args:
-    if not hdfs.mkdirs(a, permission):
-      print 'cannot make dir {}'.format(a)
+  for d in dirs:
+    if not hdfs.mkdirs(d, permission):
+      click.echo('cannot make dir {}'.format(a))
 
 
-def dfs_rm(args, hdfs):
+@hdfs_cli.command()
+@click.option('-r', '--recursive', default=False)
+@click.argument('path', nargs=-1)
+def rm(path, recursive):
   """ delete files/dirs
   """
-  recursive = False
-  opts, args = parse_args(args, 'r')
-  for o, a in opts:
-    if o == '-r':
-      recursive = True
-  for a in args:
-    if not hdfs.delete(a, recursive):
-      print 'cannot delete {}'.format(a)
+  for p in path:
+    if not hdfs.delete(p, recursive):
+      click.echo('cannot delete {}'.format(a))
 
 
-def dfs_chown(args, hdfs):
+@hdfs_cli.command()
+@click.option('-o', '--owner', default='')
+@click.option('-g', '--group', default='')
+@click.argument('path', nargs=-1)
+def chown(path, owner, group):
   """ set owner of files/dirs
   """
-  owner = ''
-  group = ''
-  opts, args = parse_args(args, 'o:g:')
-  for o, a in opts:
-    if o == '-o':
-      owner = a
-    if o == '-g':
-      group = a
-  for a in args:
+  for p in path:
     try:
-      hdfs.setowner(a, owner, group)
+      hdfs.setowner(p, owner, group)
     except Exception as e:
-      print str(e)
+      click.echo(str(e))
 
 
-def dfs_chmod(args, hdfs):
+@hdfs_cli.command()
+@click.option('-p', '--permission', default='700')
+@click.argument('path', nargs=-1)
+def chmod(path, permission):
   """ set permission of files/dirs
   """
-  permission = '700'
-  opts, args = parse_args(args, 'p:')
-  for o, a in opts:
-    if o == '-p':
-      permission = a
-  for a in args:
+  for p in path:
     try:
-      hdfs.set_permission(a, permission)
+      hdfs.set_permission(p, permission)
     except Exception as e:
-      print str(e)
+      click.echo(str(e))
 
 
-def dfs_summary(args, hdfs):
+@hdfs_cli.command()
+@click.argument('path', nargs=-1)
+def summary(path):
   """ get content summary of a dir
   """
-  opts, args = parse_args(args, '')
-  if not args:
-    args = ['']
-  for a in args:
-    if a.startswith('/'):
-      print '{}:'.format(a)
+  if not path:
+    path = ['']
+  for p in path:
+    if p.startswith('/'):
+      click.echo('{}:'.format(p))
     else:
-      print '~/{}:'.format(a)
+      click.echo('~/{}:'.format(p))
     try:
-      r = hdfs.get_content_summary(args[0])
-      print json.dumps(r, indent=2)
+      r = hdfs.get_content_summary(p)
+      click.echo(json.dumps(r, indent=2))
     except Exception as e:
-      print str(e)
-
+      click.echo(str(e))
 
 
 def main():
-  func_prefix = 'dfs_'
-  func_list = [
-    n for n in globals()
-    if isinstance(globals()[n], types.FunctionType)
-        and n.startswith(func_prefix)
-  ]
-
-  cmd = sys.argv[1] if len(sys.argv) > 1 else ''
-  func_called = func_prefix + cmd
-
-  if func_called not in func_list:
-    print 'usage: {} <command> [<args>]'.format(__file__)
-    print
-    print 'supported commands are:'
-    print
-    for func in func_list:
-      print(
-        '{:10}{}'.format(
-          func.replace(func_prefix, ''),
-          globals()[func].__doc__.strip()
-        )
-      )
-    print
-    return
-
   with open(sys.path[0] + '/config.json', 'r') as f:
     cfg = json.load(f)
-
+  global hdfs
   hdfs = WebHDFS(**cfg)
-  globals()[func_called](sys.argv[2:], hdfs)
+  hdfs_cli()
 
 
 if __name__ == "__main__":
