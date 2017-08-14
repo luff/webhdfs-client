@@ -67,7 +67,6 @@ def ls(path):
       for r in res:
         r['modificationTime'] = time.strftime(
           '%F %H:%M', time.localtime(r['modificationTime']/1000))
-        r['type'] = r['type'][0].lower().replace('f', '-')
         if p and r['pathSuffix']:
           r['pathSuffix'] = '/' + r['pathSuffix']
         click.echo(fmt.format(
