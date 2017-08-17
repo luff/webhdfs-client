@@ -19,10 +19,7 @@ def hdfs_cli():
 def home():
   """ get home dir
   """
-  try:
-    click.echo(hdfs.get_home_dir())
-  except Exception as e:
-    click.echo(str(e))
+  click.echo(hdfs.home)
 
 
 @hdfs_cli.command()
@@ -54,6 +51,7 @@ def ls(path):
     try:
       res = hdfs.list_status(p)
       if not res:
+        print '(empty)'
         continue
       if p != '/':
         p = p.rstrip('/')
@@ -67,22 +65,24 @@ def ls(path):
       for r in res:
         r['modificationTime'] = time.strftime(
           '%F %H:%M', time.localtime(r['modificationTime']/1000))
-        if p and r['pathSuffix']:
-          r['pathSuffix'] = '/' + r['pathSuffix']
+        if p == '/':
+          path = p + r['pathSuffix']
+        else:
+          path = p + '/' + r['pathSuffix']
         click.echo(fmt.format(
           get_bits(r['type'], r['permission'], r.get('aclBit', False)),
           r['owner'],
           r['group'],
           r['length'],
           r['modificationTime'],
-          p + r['pathSuffix']
+          path
         ))
     except Exception as e:
       click.echo(str(e))
 
 
 @hdfs_cli.command()
-@click.argument('files', nargs=-1)
+@click.argument('files', nargs=-1, required=True)
 def cat(files):
   """ output file content
   """
@@ -94,7 +94,7 @@ def cat(files):
 
 
 @hdfs_cli.command()
-@click.argument('src', nargs=-1)
+@click.argument('src', nargs=-1, required=True)
 @click.argument('dst', nargs=1)
 def mv(src, dst):
   """ move(rename) files/dirs
@@ -140,7 +140,7 @@ def get(src, dst, force):
 
 @hdfs_cli.command()
 @click.option('-p', '--permission', default='700')
-@click.argument('dirs', nargs=-1)
+@click.argument('dirs', nargs=-1, required=True)
 def mkdir(dirs, permission):
   """ make dirs
   """
@@ -151,7 +151,7 @@ def mkdir(dirs, permission):
 
 @hdfs_cli.command()
 @click.option('-r', '--recursive', is_flag=True)
-@click.argument('path', nargs=-1)
+@click.argument('path', nargs=-1, required=True)
 def rm(path, recursive):
   """ delete files/dirs
   """
@@ -163,7 +163,7 @@ def rm(path, recursive):
 @hdfs_cli.command()
 @click.option('-o', '--owner', default='')
 @click.option('-g', '--group', default='')
-@click.argument('path', nargs=-1)
+@click.argument('path', nargs=-1, required=True)
 def chown(path, owner, group):
   """ set owner of files/dirs
   """
@@ -176,7 +176,7 @@ def chown(path, owner, group):
 
 @hdfs_cli.command()
 @click.option('-p', '--permission', default='700')
-@click.argument('path', nargs=-1)
+@click.argument('path', nargs=-1, required=True)
 def chmod(path, permission):
   """ set permission of files/dirs
   """
@@ -206,14 +206,11 @@ def summary(path):
       click.echo(str(e))
 
 
-def main():
+if __name__ == "__main__":
   with open(sys.path[0] + '/config.json', 'r') as f:
     cfg = json.load(f)
   global hdfs
   hdfs = WebHDFS(**cfg)
+
   hdfs_cli()
-
-
-if __name__ == "__main__":
-  main()
 

@@ -7,13 +7,18 @@ import os
 import sys
 import json
 import requests
+import urllib3
+
 
 
 class WebHDFS(object):
 
-  def __init__(self, rest_api, username='', password=''):
+  def __init__(self, rest_api, username='', password='', insecure=False):
     self.rest_api = rest_api
     self._s = requests.session()
+    if insecure:
+      urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    self._verify = not insecure
     if username and password:
       self._s.auth = (username, password)
     self.home = self.get_home_dir()
@@ -49,7 +54,8 @@ class WebHDFS(object):
     p = {
       'op': 'gethomedirectory'
     }
-    r = self._s.get(self._get_url('/'), params=p)
+    r = self._s.get(
+        self._get_url('/'), params=p, verify=self._verify)
     self._process_response(r)
     return r.json().get('Path')
 
@@ -57,7 +63,8 @@ class WebHDFS(object):
     p = {
       'op': 'getcontentsummary'
     }
-    r = self._s.get(self._get_url(path), params=p)
+    r = self._s.get(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
     return r.json().get('ContentSummary')
 
@@ -65,7 +72,8 @@ class WebHDFS(object):
     p = {
       'op': 'getfilestatus'
     }
-    r = self._s.get(self._get_url(path), params=p)
+    r = self._s.get(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
     return r.json().get('FileStatus')
 
@@ -73,7 +81,8 @@ class WebHDFS(object):
     p = {
       'op': 'liststatus'
     }
-    r = self._s.get(self._get_url(path), params=p)
+    r = self._s.get(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
     return r.json().get('FileStatuses').get('FileStatus')
 
@@ -81,7 +90,8 @@ class WebHDFS(object):
     p = {
       'op': 'open'
     }
-    r = self._s.get(self._get_url(path), params=p)
+    r = self._s.get(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
     return r.text
 
@@ -93,14 +103,16 @@ class WebHDFS(object):
       'op':'concat',
       'sources': ','.join(srcs)
     }
-    r = self._s.post(self._get_url(path), params=p)
+    r = self._s.post(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
 
   def append(self, path, data=None):
     p = {
       'op':'append'
     }
-    r = self._s.post(self._get_url(path), params=p, data=data)
+    r = self._s.post(
+        self._get_url(path), params=p, data=data, verify=self._verify)
     self._process_response(r)
 
   def set_owner(self, path, owner='', group=''):
@@ -109,7 +121,8 @@ class WebHDFS(object):
       'owner': owner,
       'group': group
     }
-    r = self._s.put(self._get_url(path), params=p)
+    r = self._s.put(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
 
   def set_permission(self, path, permission='700'):
@@ -117,7 +130,8 @@ class WebHDFS(object):
       'op': 'setpermission',
       'permission': permission
     }
-    r = self._s.put(self._get_url(path), params=p)
+    r = self._s.put(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
 
   def set_times(self, path, modificationtime=-1, accesstime=-1):
@@ -126,7 +140,8 @@ class WebHDFS(object):
       'modificationtime': modificationtime,
       'accesstime': accesstime
     }
-    r = self._s.put(self._get_url(path), params=p)
+    r = self._s.put(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
 
   def create(self, path, data=None, permission='700', overwrite=False):
@@ -135,7 +150,8 @@ class WebHDFS(object):
       'permission': permission,
       'overwrite': overwrite
     }
-    r = self._s.put(self._get_url(path), params=p, data=data)
+    r = self._s.put(
+        self._get_url(path), params=p, data=data, verify=self._verify)
     self._process_response(r)
 
   def create_symlink(self, path, dest, createParent=False):
@@ -144,7 +160,8 @@ class WebHDFS(object):
       'destination': self._get_path(dest),
       'createParent': createParent
     }
-    r = self._s.put(self._get_url(path), params=p)
+    r = self._s.put(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
 
   def mkdirs(self, path, permission='700'):
@@ -152,7 +169,8 @@ class WebHDFS(object):
       'op':'mkdirs',
       'permission': permission
     }
-    r = self._s.put(self._get_url(path), params=p)
+    r = self._s.put(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
     return r.json().get('boolean')
 
@@ -161,7 +179,8 @@ class WebHDFS(object):
       'op':'rename',
       'destination': self._get_path(dest)
     }
-    r = self._s.put(self._get_url(path), params=p)
+    r = self._s.put(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
     return r.json().get('boolean')
 
@@ -170,7 +189,8 @@ class WebHDFS(object):
       'op':'delete',
       'recursive': recursive
     }
-    r = self._s.delete(self._get_url(path), params=p)
+    r = self._s.delete(
+        self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
     return r.json().get('boolean')
 
