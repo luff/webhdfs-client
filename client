@@ -44,6 +44,10 @@ def ls(path):
   if not path:
     path = ['']
   for p in path:
+    # avoid abspath from parsing relative path
+    p = os.path.abspath('/' + p)[1:]
+    if p != '/':
+      p = p.rstrip('/')
     if p.startswith('/'):
       click.echo('{}:'.format(p))
     else:
@@ -53,30 +57,24 @@ def ls(path):
       if not res:
         print '(empty)'
         continue
-      if p != '/':
-        p = p.rstrip('/')
-      p = os.path.abspath('/' + p)[1:]
-
       fmt = '{{}} {{:{}}} {{:{}}} {{:>{}}} {{}} {{}}'.format(
         max([len(r['owner']) for r in res]),
         max([len(r['group']) for r in res]),
         max([len(str(r['length'])) for r in res])
       )
       for r in res:
-        r['modificationTime'] = time.strftime(
-          '%F %H:%M', time.localtime(r['modificationTime']/1000))
-        if p == '/':
-          path = p + r['pathSuffix']
+        b = get_bits(r['type'], r['permission'], r.get('aclBit', False))
+        t = time.strftime(
+          '%F %H:%M',
+          time.localtime(r['modificationTime']/1000)
+        )
+        if not r['pathSuffix'] or p in ('/', ''):
+          f = p + r['pathSuffix']
         else:
-          path = p + '/' + r['pathSuffix']
-        click.echo(fmt.format(
-          get_bits(r['type'], r['permission'], r.get('aclBit', False)),
-          r['owner'],
-          r['group'],
-          r['length'],
-          r['modificationTime'],
-          path
-        ))
+          f = p + '/' + r['pathSuffix']
+        click.echo(
+          fmt.format(b, r['owner'], r['group'], r['length'], t, f)
+        )
     except Exception as e:
       click.echo(str(e))
 
