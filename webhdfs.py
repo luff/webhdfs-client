@@ -95,6 +95,18 @@ class WebHDFS(object):
     self._process_response(r)
     return r.text
 
+  def get(self, path, ldst):
+    p = {
+      'op': 'open'
+    }
+    r = self._s.get(
+        self._get_url(path), params=p, verify=self._verify, stream=True)
+    with open(ldst, 'wb') as f:
+      for chunk in r.iter_content(chunk_size=2**20): 
+        if chunk: # filter out keep-alive new chunks
+          f.write(chunk)
+    self._process_response(r)
+
   def concat(self, path, srcs=[]):
     if not srcs:
       return
@@ -153,6 +165,17 @@ class WebHDFS(object):
     r = self._s.put(
         self._get_url(path), params=p, data=data, verify=self._verify)
     self._process_response(r)
+
+  def put(self, path, lsrc, permission='700', overwrite=False):
+    p = {
+      'op':'create',
+      'permission': permission,
+      'overwrite': overwrite
+    }
+    with open(lsrc, 'rb') as f:
+      r = self._s.put(
+          self._get_url(path), params=p, data=f, verify=self._verify)
+      self._process_response(r)
 
   def create_symlink(self, path, dest, createParent=False):
     p = {
