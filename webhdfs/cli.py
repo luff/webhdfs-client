@@ -1,18 +1,22 @@
 #!/usr/bin/env python
+#
+# Copyright (c) 2017 luyi@neucloud.cn
+#
 
 import click
 import json
 import os
-import sys
 import time
 
-sys.dont_write_bytecode = True
 from webhdfs import WebHDFS
 
 
 @click.group()
 def hdfs_cli():
-  pass
+  with open(os.path.expanduser('~') + '/.whdfsc.json', 'r') as f:
+    cfg = json.load(f)
+  global hdfs
+  hdfs = WebHDFS(**cfg)
 
 
 @hdfs_cli.command()
@@ -228,10 +232,5 @@ def summary(path):
 
 
 if __name__ == "__main__":
-  with open(sys.path[0] + '/config.json', 'r') as f:
-    cfg = json.load(f)
-  global hdfs
-  hdfs = WebHDFS(**cfg)
-
   hdfs_cli()
 

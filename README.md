@@ -1,7 +1,12 @@
 # webhdfs-client
 
-## configure
-put a config.json alone with the client
+## installation
+```
+pip install https://github.com/luff/webhdfs-client
+```
+
+## configuration
+put a .whdfsc.json in your home directory
 ```
 {
   "insecure": false,
@@ -10,3 +15,4 @@ put a config.json alone with the client
   "rest_api": "https://your-webhdfs-gateway/webhdfs/v1"
 }
 ```
+
