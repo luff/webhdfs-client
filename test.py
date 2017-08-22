@@ -3,8 +3,9 @@
 # Copyright (c) 2017 luyi@neucloud.cn
 #
 
-import os
 import json
+import os
+import sys
 
 from webhdfs.webhdfs import WebHDFS
 
@@ -15,10 +16,10 @@ def main():
   hdfs = WebHDFS(**test_config)
 
   print " > echo -n '1234567890' > test.txt"
-  hdfs.create('test.txt', data='1234567890', overwrite=True)
+  hdfs.create('test.txt', lsrc=__file__, overwrite=True)
 
   print " > echo -n 'abcdefg' >> test.txt"
-  hdfs.append('test.txt', data='abcdefg')
+  hdfs.append('test.txt', data='abcdefg\n')
 
   print " > ls test.txt"
   print hdfs.list_status('test.txt')

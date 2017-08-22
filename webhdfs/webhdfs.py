@@ -3,9 +3,10 @@
 # Copyright (c) 2017 luyi@neucloud.cn
 #
 
-import os
 import json
+import os
 import requests
+import sys
 
 
 class WebHDFS(object):
@@ -83,26 +84,21 @@ class WebHDFS(object):
     self._process_response(r)
     return r.json().get('FileStatuses').get('FileStatus')
 
-  def open(self, path):
-    p = {
-      'op': 'open'
-    }
-    r = self._s.get(
-        self._get_url(path), params=p, verify=self._verify)
-    self._process_response(r)
-    return r.text
-
-  def get(self, path, ldst):
+  def open(self, path, ldst='-'):
     p = {
       'op': 'open'
     }
     r = self._s.get(
         self._get_url(path), params=p, verify=self._verify, stream=True)
-    with open(ldst, 'wb') as f:
-      for chunk in r.iter_content(chunk_size=2**20): 
+    self._process_response(r)
+    try:
+      f = sys.stdout if ldst == '-' else open(ldst, 'w')
+      for chunk in r.iter_content(chunk_size=2**16): 
         if chunk: # filter out keep-alive new chunks
           f.write(chunk)
-    self._process_response(r)
+    finally:
+      if f is not sys.stdout:
+        f.close()
 
   def concat(self, path, srcs=[]):
     if not srcs:
@@ -153,23 +149,13 @@ class WebHDFS(object):
         self._get_url(path), params=p, verify=self._verify)
     self._process_response(r)
 
-  def create(self, path, data=None, permission='700', overwrite=False):
+  def create(self, path, lsrc, permission='700', overwrite=False):
     p = {
       'op':'create',
       'permission': permission,
       'overwrite': overwrite
     }
-    r = self._s.put(
-        self._get_url(path), params=p, data=data, verify=self._verify)
-    self._process_response(r)
-
-  def put(self, path, lsrc, permission='700', overwrite=False):
-    p = {
-      'op':'create',
-      'permission': permission,
-      'overwrite': overwrite
-    }
-    with open(lsrc, 'rb') as f:
+    with open(lsrc, 'r') as f:
       r = self._s.put(
           self._get_url(path), params=p, data=f, verify=self._verify)
       self._process_response(r)

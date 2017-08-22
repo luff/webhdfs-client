@@ -105,18 +105,6 @@ def ls(path):
 
 
 @hdfs_cli.command()
-@click.argument('files', nargs=-1, required=True)
-def cat(files):
-  """ output file content
-  """
-  for f in files:
-    try:
-      click.echo(hdfs.open(f))
-    except Exception as e:
-      click.echo(str(e))
-
-
-@hdfs_cli.command()
 @click.argument('src', nargs=-1, required=True)
 @click.argument('dst', nargs=1)
 def mv(src, dst):
@@ -124,8 +112,16 @@ def mv(src, dst):
   """
   for s in src:
     ddst = '{}/{}'.format(dst.rstrip('/'), os.path.basename(s))
-    if not hdfs.rename(s, ddst) and not hdfs.rename(s, dst):
-      click.echo('cannot move {} to {}'.format(s, dst))
+    try:
+      click.echo(ddst)
+      r = hdfs.rename(s, ddst)
+      click.echo(str(r))
+    except:
+      click.echo(dst)
+      r = hdfs.rename(s, dst)
+      click.echo(str(r))
+      if not r:
+        click.echo('cannot move {} to {}'.format(s, dst))
 
 
 @hdfs_cli.command()
@@ -139,7 +135,7 @@ def put(src, dst, permission, force):
   if not os.path.isfile(src):
     click.echo('no such file: {}'.format(src))
   try:
-    hdfs.put(dst, src, permission, force)
+    hdfs.create(dst, src, permission, force)
   except Exception as e:
     click.echo(str(e))
 
@@ -154,9 +150,21 @@ def get(src, dst, force):
   if os.path.isfile(dst) and not force:
     click.echo('file already exists: {}'.format(dst))
   try:
-    hdfs.get(src, dst)
+    hdfs.open(src, dst)
   except Exception as e:
     click.echo(str(e))
+
+
+@hdfs_cli.command()
+@click.argument('files', nargs=-1, required=True)
+def cat(files):
+  """ output file content
+  """
+  for f in files:
+    try:
+      hdfs.open(f)
+    except Exception as e:
+      click.echo(str(e))
 
 
 @hdfs_cli.command()
@@ -167,7 +175,7 @@ def mkdir(dirs, permission):
   """
   for d in dirs:
     if not hdfs.mkdirs(d, permission):
-      click.echo('cannot make dir {}'.format(a))
+      click.echo('cannot make dir {}'.format(d))
 
 
 @hdfs_cli.command()
@@ -178,7 +186,7 @@ def rm(path, recursive):
   """
   for p in path:
     if not hdfs.delete(p, recursive):
-      click.echo('cannot delete {}'.format(a))
+      click.echo('cannot delete {}'.format(p))
 
 
 @hdfs_cli.command()
