@@ -113,15 +113,10 @@ def mv(src, dst):
   for s in src:
     ddst = '{}/{}'.format(dst.rstrip('/'), os.path.basename(s))
     try:
-      click.echo(ddst)
-      r = hdfs.rename(s, ddst)
-      click.echo(str(r))
-    except:
-      click.echo(dst)
-      r = hdfs.rename(s, dst)
-      click.echo(str(r))
-      if not r:
+      if not hdfs.rename(s, dst) and not hdfs.rename(s, ddst):
         click.echo('cannot move {} to {}'.format(s, dst))
+    except Exception as e:
+      click.echo(str(e))
 
 
 @hdfs_cli.command()
@@ -174,8 +169,11 @@ def mkdir(dirs, permission):
   """ make dirs
   """
   for d in dirs:
-    if not hdfs.mkdirs(d, permission):
-      click.echo('cannot make dir {}'.format(d))
+    try:
+      if not hdfs.mkdirs(d, permission):
+        click.echo('cannot make dir {}'.format(d))
+    except Exception as e:
+      click.echo(str(e))
 
 
 @hdfs_cli.command()
@@ -185,8 +183,11 @@ def rm(path, recursive):
   """ delete files/dirs
   """
   for p in path:
-    if not hdfs.delete(p, recursive):
-      click.echo('cannot delete {}'.format(p))
+    try:
+      if not hdfs.delete(p, recursive):
+        click.echo('cannot delete {}'.format(p))
+    except Exception as e:
+      click.echo(str(e))
 
 
 @hdfs_cli.command()
