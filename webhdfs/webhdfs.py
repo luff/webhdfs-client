@@ -96,7 +96,7 @@ class WebHDFS(object):
     self._process_response(r)
     try:
       f = sys.stdout if ldst == '-' else open(ldst, 'w')
-      for chunk in r.iter_content(chunk_size=2**16): 
+      for chunk in r.iter_content(chunk_size=2**16):
         if chunk: # filter out keep-alive new chunks
           f.write(chunk)
     finally:

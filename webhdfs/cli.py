@@ -4,11 +4,63 @@
 #
 
 import click
+import fnmatch
 import json
 import os
+import re
 import time
 
 from webhdfs import WebHDFS
+
+
+def _glob(path):
+  result = []
+  magic_check = re.compile("([*?[])")
+
+  def recursive(levels):
+    lvls = levels[:]
+    base = "/"
+    for i, pattern in enumerate(lvls):
+      if magic_check.search(pattern):
+        ls = []
+        try:
+          ls = hdfs.list_status(base)
+        except Exception as e:
+          click.echo('failed list status {}'.format(base))
+        ps = [ p['pathSuffix'] for p in ls ]
+        for p in fnmatch.filter(ps, pattern):
+          lvls[i] = p
+          recursive(lvls)
+        return
+      else:
+        base = os.path.join(base, pattern)
+    try:
+      hdfs.get_file_status(base)
+      result.append(base)
+    except Exception as e:
+      return
+
+  recursive(path.split("/")[1:])
+  return result or [path]
+
+
+def paths(path, magic=True):
+  result = []
+  magic_check = re.compile("([*?[])")
+
+  for p in path:
+    if p.startswith("~/") or p == "~":
+      p = re.sub("^~", hdfs.home, p)
+    elif p[0] != "/":
+      p = os.path.join(hdfs.home, p)
+    if p != "/":
+      p = p.rstrip("/")
+    if magic_check.search(p):
+      result.extend(_glob(p))
+    else:
+      result.append(p)
+
+  return result
 
 
 @click.group()
@@ -27,29 +79,21 @@ def home():
 
 
 @hdfs_cli.command()
-@click.argument('path', nargs=-1, required=True)
-def stat(path):
+@click.argument('target', nargs=-1, required=True)
+def stat(target):
   """ get files/dirs status
   """
-  for p in path:
-    # avoid abspath from parsing relative path
-    p = os.path.abspath('/' + p)[1:]
-    if p != '/':
-      p = p.rstrip('/')
-    if p.startswith('/'):
-      click.echo('{}:'.format(p))
-    else:
-      click.echo('~/{}:'.format(p))
+  for p in paths(target):
     try:
       r = hdfs.get_file_status(p)
       click.echo(json.dumps(r, indent=2))
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 @hdfs_cli.command()
-@click.argument('path', nargs=-1)
-def ls(path):
+@click.argument('target', nargs=-1)
+def ls(target):
   """ list files/dirs status
   """
   def get_bits(file_type, permission, acl=False):
@@ -66,21 +110,14 @@ def ls(path):
     ba = '+' if acl else ' '
     return bt + bp + ba
 
-  if not path:
-    path = ['']
-  for p in path:
-    # avoid abspath from parsing relative path
-    p = os.path.abspath('/' + p)[1:]
-    if p != '/':
-      p = p.rstrip('/')
-    if p.startswith('/'):
-      click.echo('{}:'.format(p))
-    else:
-      click.echo('~/{}:'.format(p))
+  if not target:
+    target = ['~']
+  for p in paths(target):
+    click.secho('{}:'.format(p), reverse=True)
     try:
       res = hdfs.list_status(p)
       if not res:
-        print '(empty)'
+        click.echo('(empty)')
         continue
       fmt = '{{}} {{:{}}} {{:{}}} {{:>{}}} {{}} {{}}'.format(
         max([len(r['owner']) for r in res]),
@@ -101,143 +138,136 @@ def ls(path):
           fmt.format(b, r['owner'], r['group'], r['length'], t, f)
         )
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 @hdfs_cli.command()
-@click.argument('src', nargs=-1, required=True)
-@click.argument('dst', nargs=1)
-def mv(src, dst):
+@click.argument('source', nargs=-1, required=True)
+@click.argument('target', nargs=1)
+def mv(source, target):
   """ move(rename) files/dirs
   """
-  for s in src:
-    ddst = '{}/{}'.format(dst.rstrip('/'), os.path.basename(s))
+  for s in paths(source):
+    dtarget = '{}/{}'.format(target.rstrip('/'), os.path.basename(s))
     try:
-      if not hdfs.rename(s, dst) and not hdfs.rename(s, ddst):
-        click.echo('cannot move {} to {}'.format(s, dst))
+      if not hdfs.rename(s, target) and not hdfs.rename(s, dtarget):
+        click.echo('cannot move {} to {}'.format(s, target))
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 @hdfs_cli.command()
 @click.option('-p', '--permission', default='700')
 @click.option('-f', '--force', is_flag=True)
-@click.argument('src', nargs=1)
-@click.argument('dst', nargs=1)
-def put(src, dst, permission, force):
+@click.argument('source', nargs=-1)
+@click.argument('target', nargs=1)
+def put(source, target, permission, force):
   """ copy from local
   """
-  if not os.path.isfile(src):
-    click.echo('no such file: {}'.format(src))
+  if not os.path.isfile(source):
+    click.echo('no such file: {}'.format(source))
   try:
-    hdfs.create(dst, src, permission, force)
+    hdfs.create(target, source, permission, force)
   except Exception as e:
-    click.echo(str(e))
+    click.echo(e)
 
 
 @hdfs_cli.command()
 @click.option('-f', '--force', is_flag=True)
-@click.argument('src', nargs=1)
-@click.argument('dst', nargs=1)
-def get(src, dst, force):
+@click.argument('source', nargs=-1)
+@click.argument('target', nargs=1)
+def get(source, target, force):
   """ copy to local
   """
-  if os.path.isfile(dst) and not force:
-    click.echo('file already exists: {}'.format(dst))
+  if os.path.isfile(target) and not force:
+    click.echo('file already exists: {}'.format(target))
   try:
-    hdfs.open(src, dst)
+    hdfs.open(source, target)
   except Exception as e:
-    click.echo(str(e))
+    click.echo(e)
 
 
 @hdfs_cli.command()
-@click.argument('files', nargs=-1, required=True)
-def cat(files):
+@click.argument('target', nargs=-1, required=True)
+def cat(target):
   """ output file content
   """
-  for f in files:
+  for f in paths(target):
     try:
       hdfs.open(f)
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 @hdfs_cli.command()
 @click.option('-p', '--permission', default='700')
-@click.argument('dirs', nargs=-1, required=True)
-def mkdir(dirs, permission):
+@click.argument('target', nargs=-1, required=True)
+def mkdir(target, permission):
   """ make dirs
   """
-  for d in dirs:
+  for d in paths(target):
     try:
       if not hdfs.mkdirs(d, permission):
         click.echo('cannot make dir {}'.format(d))
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 @hdfs_cli.command()
 @click.option('-r', '--recursive', is_flag=True)
-@click.argument('path', nargs=-1, required=True)
-def rm(path, recursive):
+@click.argument('target', nargs=-1, required=True)
+def rm(target, recursive):
   """ delete files/dirs
   """
-  for p in path:
+  for p in paths(target):
     try:
       if not hdfs.delete(p, recursive):
         click.echo('cannot delete {}'.format(p))
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 @hdfs_cli.command()
 @click.option('-o', '--owner', default='')
 @click.option('-g', '--group', default='')
-@click.argument('path', nargs=-1, required=True)
-def chown(path, owner, group):
+@click.argument('target', nargs=-1, required=True)
+def chown(target, owner, group):
   """ set owner of files/dirs
   """
-  for p in path:
+  for p in paths(target):
     try:
       hdfs.setowner(p, owner, group)
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 @hdfs_cli.command()
 @click.option('-p', '--permission', default='700')
-@click.argument('path', nargs=-1, required=True)
-def chmod(path, permission):
+@click.argument('target', nargs=-1, required=True)
+def chmod(target, permission):
   """ set permission of files/dirs
   """
-  for p in path:
+  for p in paths(target):
     try:
       hdfs.set_permission(p, permission)
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 @hdfs_cli.command()
-@click.argument('path', nargs=-1)
-def summary(path):
+@click.argument('target', nargs=-1)
+def summary(target):
   """ get content summary of a dir
   """
-  if not path:
-    path = ['']
-  for p in path:
-    # avoid abspath from parsing relative path
-    p = os.path.abspath('/' + p)[1:]
-    if p != '/':
-      p = p.rstrip('/')
-    if p.startswith('/'):
-      click.echo('{}:'.format(p))
-    else:
-      click.echo('~/{}:'.format(p))
+  if not target:
+    target = ['~']
+  for p in paths(target):
+    click.secho('{}:'.format(p), reverse=True)
     try:
       r = hdfs.get_content_summary(p)
       click.echo(json.dumps(r, indent=2))
     except Exception as e:
-      click.echo(str(e))
+      click.echo(e)
 
 
 if __name__ == "__main__":
