@@ -159,7 +159,7 @@ def mv(source, target):
 @hdfs_cli.command()
 @click.option('-p', '--permission', default='700')
 @click.option('-f', '--force', is_flag=True)
-@click.argument('source', nargs=-1)
+@click.argument('source', nargs=1)
 @click.argument('target', nargs=1)
 def put(source, target, permission, force):
   """ copy from local
@@ -174,7 +174,7 @@ def put(source, target, permission, force):
 
 @hdfs_cli.command()
 @click.option('-f', '--force', is_flag=True)
-@click.argument('source', nargs=-1)
+@click.argument('source', nargs=1)
 @click.argument('target', nargs=1)
 def get(source, target, force):
   """ copy to local
