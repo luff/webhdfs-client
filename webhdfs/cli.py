@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2017 luyi@neucloud.cn
+# Copyright (c) 2019 Lu.Yi
 #
 
 import click
@@ -10,7 +10,7 @@ import os
 import re
 import time
 
-from webhdfs import WebHDFS
+from .webhdfs import WebHDFS
 
 
 def _glob(path):

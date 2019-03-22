@@ -1,11 +1,19 @@
 # webhdfs-client
 
-## installation
+A linux command line webhdfs client.
+
+## Installation
+```
+pip install webhdfs-client
+```
+
+or
+
 ```
 pip install git+https://github.com/luff/webhdfs-client.git
 ```
 
-## configuration
+## Configuration
 put a .whdfsc.json in your home directory
 ```
 {
@@ -16,8 +24,12 @@ put a .whdfsc.json in your home directory
 }
 ```
 
-## usage
+## Usage
 ```
 whdfsc --help
 ```
+
+## License
+
+See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
 

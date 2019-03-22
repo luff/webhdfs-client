@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2017 luyi@neucloud.cn
+# Copyright (c) 2019 Lu.Yi
 #
 
 import json
 import os
 import requests
 import sys
-
-reload(sys)
-sys.setdefaultencoding("utf-8")
 
 
 class WebHDFS(object):
