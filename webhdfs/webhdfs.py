@@ -119,8 +119,11 @@ class WebHDFS(object):
     p = {
       'op':'append'
     }
+    h = {
+      'content-type':'application/octet-stream'
+    }
     r = self._s.post(
-        self._get_url(path), params=p, data=data, verify=self._verify)
+        self._get_url(path), params=p, headers=h, data=data, verify=self._verify)
     self._process_response(r)
 
   def set_owner(self, path, owner='', group=''):
@@ -158,9 +161,12 @@ class WebHDFS(object):
       'permission': permission,
       'overwrite': overwrite
     }
+    h = {
+      'content-type':'application/octet-stream'
+    }
     with open(lsrc, 'rb') as f:
       r = self._s.put(
-          self._get_url(path), params=p, data=f, verify=self._verify)
+          self._get_url(path), params=p, headers=h, data=f, verify=self._verify)
       self._process_response(r)
 
   def create_symlink(self, path, dest, createParent=False):
