@@ -92,10 +92,13 @@ class WebHDFS(object):
         self._get_url(path), params=p, verify=self._verify, stream=True)
     self._process_response(r)
     try:
-      f = sys.stdout if ldst == '-' else open(ldst, 'w')
+      f = sys.stdout if ldst == '-' else open(ldst, 'wb')
+      d = (ldst == '-')
       for chunk in r.iter_content(chunk_size=2**16):
         if chunk: # filter out keep-alive new chunks
-          f.write(chunk)
+          f.write(
+            chunk.decode('utf-8') if d else chunk
+          )
     finally:
       if f is not sys.stdout:
         f.close()
@@ -155,7 +158,7 @@ class WebHDFS(object):
       'permission': permission,
       'overwrite': overwrite
     }
-    with open(lsrc, 'r') as f:
+    with open(lsrc, 'rb') as f:
       r = self._s.put(
           self._get_url(path), params=p, data=f, verify=self._verify)
       self._process_response(r)
